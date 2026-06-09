@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחשבון התאמת מרעד - Vibration Shaker Feasibility Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap');
+        body { font-family: 'Rubik', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div class="bg-gradient-to-r flow-root from-blue-700 to-indigo-800 p-6 text-white text-center md:text-right">
+            <h1 class="text-2xl md:text-3xl font-bold">מחשבון בדיקת התאמה ויכולת מרעד</h1>
+            <p class="text-blue-100 text-sm mt-1">חישוב אנרגיה, כוחות ומגבלות פיזיקליות עבור פרופילי הרעדה</p>
+        </div>
+
+        <div class="p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <h2 class="text-lg font-bold mb-4 text-indigo-900 border-b pb-2">1. סוג פרופיל ומסה</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">סוג פרופיל</label>
+                            <select id="profileType" onchange="handleProfileTypeChange()" class="w-full bg-white border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="random">Random (אקראי)</option>
+                                <option value="sine">Sine (סינוס)</option>
+                                <option value="sor">SOR (Sine on Random)</option>
+                                <option value="ror">ROR (Random on Random)</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">משקל Armature (LBS)</label>
+                                <input type="number" id="wArmature" value="170" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">משקל Jig / מתאם (LBS)</label>
+                                <input type="number" id="wJig" value="400" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">משקל פריט נבדק / DUT (LBS)</label>
+                            <input type="number" id="wDut" value="1100" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+
+                        <div class="bg-indigo-50 p-3 rounded-lg flex justify-between items-center border border-indigo-100">
+                            <span class="text-sm font-medium text-indigo-900">סה"כ מסה נע (Total Mass):</span>
+                            <span id="totalMassDisplay" class="font-bold text-indigo-700 text-lg">1,670 LBS</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <h2 class="text-lg font-bold mb-4 text-indigo-900 border-b pb-2">2. מגבלות המרעד (Shaker Limits)</h2>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">כוח שיא - Max Force (LBF Peak)</label>
+                                <input type="number" id="limForce" value="54000" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">תאוצה - Max Accel (G Peak)</label>
+                                <input type="number" id="limAccel" value="120" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">מהירות - Max Vel (in/s Peak)</label>
+                                <input type="number" id="limVel" value="100" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">מפתח - Max Disp (in PK-PK)</label>
+                                <input type="number" id="limDisp" value="3" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Crest Factor (ברירת מחדל לרנדום: 3)</label>
+                            <input type="number" id="crestFactor" value="3" oninput="calculate()" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b pb-3">
+                        <h2 class="text-lg font-bold text-indigo-900">3. נקודות הפרופיל (Profile Breakpoints)</h2>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <button onclick="addRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition shadow-xs cursor-pointer">+ הוסף שורה</button>
+                            <button onclick="clearTable()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer">נקה הכל</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">הדבקה מהירה מאקסל (העתק 2 עמודות באקסל והדבק פה):</label>
+                        <textarea id="excelPaste" placeholder="לחץ כאן והדבק (Ctrl+V) נתונים מאקסל..." rows="2" class="w-full border border-dashed border-gray-300 rounded-lg p-2 text-xs bg-gray-50 focus:bg-white outline-none" oninput="handleExcelPaste(this)"></textarea>
+                    </div>
+
+                    <div class="overflow-x-auto max-h-[320px] overflow-y-auto border border-gray-200 rounded-lg">
+                        <table class="w-full text-sm text-center" id="breakpointTable">
+                            <thead class="bg-gray-100 text-gray-700 sticky top-0">
+                                <tr>
+                                    <th class="p-2.5 border-b">תדר Freq (Hz)</th>
+                                    <th class="p-2.5 border-b" id="valueHeader">ASD (G²/Hz)</th>
+                                    <th class="p-2.5 border-b w-16">פעולה</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200" id="tableBody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 text-indigo-900 border-b pb-2">4. סטטוס ומערכת רמזורים (Limits Check)</h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-right border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 uppercase text-xs tracking-wider">
+                                    <th class="p-3 text-center">פרמטר</th>
+                                    <th class="p-3 text-center">פרופיל (RMS)</th>
+                                    <th class="p-3 text-center">צפי שיא (Expected Peak)</th>
+                                    <th class="p-3 text-center">מגבלת מרעד</th>
+                                    <th class="p-3 text-center">אחוז ניצול</th>
+                                    <th class="p-3 text-center">סטטוס</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 font-medium">
+                                <tr id="rowAccel">
+                                    <td class="p-3 font-bold">Acceleration (gn)</td>
+                                    <td class="p-3 text-center text-gray-600" id="resRMSAccel">-</td>
+                                    <td class="p-3 text-center font-semibold" id="resPeakAccel">-</td>
+                                    <td class="p-3 text-center text-gray-500" id="limDisplayAccel">-</td>
+                                    <td class="p-3 text-center font-bold" id="pctAccel">-</td>
+                                    <td class="p-3 text-center"><span id="statusAccel" class="inline-block w-4 h-4 rounded-full bg-gray-300"></span></td>
+                                </tr>
+                                <tr id="rowVel">
+                                    <td class="p-3 font-bold">Velocity (in/s)</td>
+                                    <td class="p-3 text-center text-gray-600" id="resRMSVel">-</td>
+                                    <td class="p-3 text-center font-semibold" id="resPeakVel">-</td>
+                                    <td class="p-3 text-center text-gray-500" id="limDisplayVel">-</td>
+                                    <td class="p-3 text-center font-bold" id="pctVel">-</td>
+                                    <td class="p-3 text-center"><span id="statusVel" class="inline-block w-4 h-4 rounded-full bg-gray-300"></span></td>
+                                </tr>
+                                <tr id="rowDisp">
+                                    <td class="p-3 font-bold">Displacement (in PK-PK)</td>
+                                    <td class="p-3 text-center text-gray-600" id="resRMSDisp">-</td>
+                                    <td class="p-3 text-center font-semibold" id="resPeakDisp">-</td>
+                                    <td class="p-3 text-center text-gray-500" id="limDisplayDisp">-</td>
+                                    <td class="p-3 text-center font-bold" id="pctDisp">-</td>
+                                    <td class="p-3 text-center"><span id="statusDisp" class="inline-block w-4 h-4 rounded-full bg-gray-300"></span></td>
+                                </tr>
+                                <tr id="rowForce">
+                                    <td class="p-3 font-bold">Force (LBF)</td>
+                                    <td class="p-3 text-center text-gray-600" id="resRMSForce">-</td>
+                                    <td class="p-3 text-center font-semibold" id="resPeakForce">-</td>
+                                    <td class="p-3 text-center text-gray-500" id="limDisplayForce">-</td>
+                                    <td class="p-3 text-center font-bold" id="pctForce">-</td>
+                                    <td class="p-3 text-center"><span id="statusForce" class="inline-block w-4 h-4 rounded-full bg-gray-300"></span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // אתחול עם נתוני ברירת מחדל (הפרופיל הראשון מהתמונה המקורית שלך)
+        const defaultData = [
+            { freq: 5, val: 0.1200 },
+            { freq: 10, val: 0.1200 },
+            { freq: 18, val: 1.2500 },
+            { freq: 20, val: 1.2500 },
+            { freq: 20, val: 4.9500 },
+            { freq: 26, val: 4.9500 },
+            { freq: 26, val: 1.2500 },
+            { freq: 40, val: 0.3980 },
+            { freq: 40, val: 0.0580 },
+            { freq: 60, val: 0.0580 },
+            { freq: 60, val: 0.0270 },
+            { freq: 200, val: 0.0270 },
+            { freq: 200, val: 0.0800 },
+            { freq: 1200, val: 0.0800 },
+            { freq: 2000, val: 0.0289 }
+        ];
+
+        window.onload = function() {
+            initTable(defaultData);
+            calculate();
+        };
+
+        function initTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                createRowElement(item.freq, item.val);
+            });
+        }
+
+        function createRowElement(freq, val) {
+            const tbody = document.getElementById('tableBody');
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-gray-50 transition";
+            tr.innerHTML = `
+                <td class="p-1.5"><input type="number" step="any" value="${freq}" oninput="calculate()" class="freq-input w-full bg-transparent border border-transparent hover:border-gray-300 focus:bg-white focus:border-indigo-500 rounded p-1 text-center outline-none"></td>
+                <td class="p-1.5"><input type="number" step="any" value="${val}" oninput="calculate()" class="val-input w-full bg-transparent border border-transparent hover:border-gray-300 focus:bg-white focus:border-indigo-500 rounded p-1 text-center outline-none"></td>
+                <td class="p-1.5 text-center"><button onclick="this.closest('tr').remove(); calculate();" class="text-rose-600 hover:text-rose-900 font-bold text-lg cursor-pointer">×</button></td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function addRow() {
+            createRowElement('', '');
+        }
+
+        function clearTable() {
+            document.getElementById('tableBody').innerHTML = '';
+            calculate();
+        }
+
+        function handleProfileTypeChange() {
+            const type = document.getElementById('profileType').value;
+            const header = document.getElementById('valueHeader');
+            if (type === 'sine') {
+                header.innerText = "Target (G Peak)";
+            } else {
+                header.innerText = "ASD (G²/Hz)";
+            }
+            calculate();
+        }
+
+        function handleExcelPaste(textarea) {
+            const text = textarea.value.trim();
+            if (!text) return;
+
+            const lines = text.split('\n');
+            const parsedData = [];
+
+            lines.forEach(line => {
+                // פיצול לפי טאב (אקסל) או פסיק/רווח
+                const tokens = line.split(/[\t,]+/);
+                if (tokens.length >= 2) {
+                    const f = parseFloat(tokens[0].trim());
+                    const v = parseFloat(tokens[1].trim());
+                    if (!isNaN(f) && !isNaN(v)) {
+                        parsedData.push({ freq: f, val: v });
+                    }
+                }
+            });
+
+            if (parsedData.length > 0) {
+                initTable(parsedData);
+                calculate();
+                textarea.value = ''; // ניקוי התיבה לאחר ייבוא מוצלח
+            }
+        }
+
+        function calculate() {
+            // 1. חישוב מסה
+            const wArmature = parseFloat(document.getElementById('wArmature').value) || 0;
+            const wJig = parseFloat(document.getElementById('wJig').value) || 0;
+            const wDut = parseFloat(document.getElementById('wDut').value) || 0;
+            const totalMassLBS = wArmature + wJig + wDut;
+            document.getElementById('totalMassDisplay').innerText = totalMassLBS.toLocaleString() + " LBS";
+
+            // איסוף נקודות מהטבלה
+            const rows = Array.from(document.querySelectorAll('#tableBody tr'));
+            const points = rows.map(row => {
+                return {
+                    f: parseFloat(row.querySelector('.freq-input').value),
+                    v: parseFloat(row.querySelector('.val-input').value)
+                };
+            }).filter(p => !isNaN(p.f) && !isNaN(p.v));
+
+            // מיון לפי תדר לטובת חישובים אינטגרליים תקינים
+            points.sort((a, b) => a.f - b.f);
+
+            const profileType = document.getElementById('profileType').value;
+            const crestFactor = parseFloat(document.getElementById('crestFactor').value) || 3;
+
+            let rmsAccel = 0;
+            let rmsVel = 0;
+            let rmsDisp = 0;
+
+            if (points.length >= 2) {
+                if (profileType === 'random' || profileType === 'sor' || profileType === 'ror') {
+                    // חישוב אינטגרציה לפרופיל אקראי (Random Vibration Integration)
+                    let totalAreaG2 = 0;
+                    let totalAreaV2 = 0;
+                    let totalAreaD2 = 0;
+                    
+                    const g_in = 386.0885; // תאוצת כובד באינץ' לשנייה בריבוע
+
+                    for (let i = 0; i < points.length - 1; i++) {
+                        let f1 = points[i].f;
+                        let f2 = points[i + 1].f;
+                        let asd1 = points[i].v;
+                        let asd2 = points[i + 1].v;
+
+                        if (f1 === f2 || f1 <= 0 || f2 <= 0) continue;
+
+                        // שיפוע לוגריתמי
+                        let m = Math.log(asd2 / asd1) / Math.log(f2 / f1);
+
+                        // 1. אינטגרל תאוצה G_rms^2
+                        let areaG2 = 0;
+                        if (Math.abs(m + 1) < 1e-6) {
+                            areaG2 = asd1 * f1 * Math.log(f2 / f1);
+                        } else {
+                            areaG2 = (asd2 * f2 - asd1 * f1) / (m + 1);
+                        }
+                        totalAreaG2 += areaG2;
+
+                        // 2. אינטגרל מהירות (Velocity RMS^2)
+                        let mv = m - 2;
+                        let areaV2 = 0;
+                        let constV = Math.pow(g_in, 2) / Math.pow(2 * Math.PI, 2);
+                        if (Math.abs(mv + 1) < 1e-6) {
+                            areaV2 = constV * (asd1 / f1) * Math.log(f2 / f1);
+                        } else {
+                            areaV2 = constV * (asd2 / f2 - asd1 / f1) / (mv + 1);
+                        }
+                        totalAreaV2 += areaV2;
+
+                        // 3. אינטגרל מפתח (Displacement RMS^2)
+                        let md = m - 4;
+                        let areaD2 = 0;
+                        let constD = Math.pow(g_in, 2) / Math.pow(2 * Math.PI, 4);
+                        if (Math.abs(md + 1) < 1e-6) {
+                            areaD2 = constD * (asd1 / Math.pow(f1, 3)) * Math.log(f2 / f1);
+                        } else {
+                            areaD2 = constD * (asd2 / Math.pow(f2, 3) - asd1 / Math.pow(f1, 3)) / (md + 1);
+                        }
+                        totalAreaD2 += areaD2;
+                    }
+
+                    rmsAccel = Math.sqrt(totalAreaG2);
+                    rmsVel = Math.sqrt(totalAreaV2);
+                    rmsDisp = Math.sqrt(totalAreaD2);
+
+                } else if (profileType === 'sine') {
+                    // פרופיל סינוס - לוקחים את ערכי המקסימום (Worst Case Peak) לאורך נקודות המערך
+                    const g_in = 386.0885;
+                    let maxA = 0;
+                    let maxV = 0;
+                    let maxD = 0;
+
+                    points.forEach(p => {
+                        let a_peak = p.v; 
+                        let v_peak = (a_peak * g_in) / (2 * Math.PI * p.f);
+                        let d_pk_pk = 2 * (a_peak * g_in) / Math.pow(2 * Math.PI * p.f, 2);
+
+                        if (a_peak > maxA) maxA = a_peak;
+                        if (v_peak > maxV) maxV = v_peak;
+                        if (d_pk_pk > maxD) maxD = d_pk_pk;
+                    });
+
+                    // בסינוס נשמור את הפיקים כבסיס החישוב הישיר
+                    rmsAccel = maxA / Math.sqrt(2); // RMS רק לשם הצגה תיאורטית
+                    rmsVel = maxV / Math.sqrt(2);
+                    rmsDisp = (maxD / 2) / Math.sqrt(2);
+                    
+                    // נדרוס את ה-Peak ישירות עבור סינוס בהמשך
+                }
+            }
+
+            // חישוב ערכי קצה ופיקים בהתאם לסוג הפרופיל
+            let peakAccel, peakVel, peakDisp, rmsForce, peakForce;
+
+            if (profileType === 'sine') {
+                const g_in = 386.0885;
+                peakAccel = rmsAccel * Math.sqrt(2);
+                peakVel = rmsVel * Math.sqrt(2);
+                peakDisp = rmsDisp * Math.sqrt(2) * 2; // PK-PK
+                peakForce = totalMassLBS * peakAccel;
+                rmsForce = peakForce / Math.sqrt(2);
+            } else {
+                // Random / SOR / ROR עם Crest Factor
+                peakAccel = rmsAccel * crestFactor;
+                peakVel = rmsVel * crestFactor;
+                peakDisp = rmsDisp * crestFactor * 2; // PK-PK הפיק המוערך הלוך וחזור
+                rmsForce = totalMassLBS * rmsAccel;
+                peakForce = rmsForce * crestFactor;
+            }
+
+            // קריאת מגבלות המרעד
+            const limForce = parseFloat(document.getElementById('limForce').value) || 1;
+            const limAccel = parseFloat(document.getElementById('limAccel').value) || 1;
+            const limVel = parseFloat(document.getElementById('limVel').value) || 1;
+            const limDisp = parseFloat(document.getElementById('limDisp').value) || 1;
+
+            // חישוב אחוזי ניצול ומערכת רמזורים
+            updateTableRow('Accel', rmsAccel, peakAccel, limAccel, "gn");
+            updateTableRow('Vel', rmsVel, peakVel, limVel, "in/s");
+            updateTableRow('Disp', rmsDisp, peakDisp, limDisp, "in");
+            updateTableRow('Force', rmsForce, peakForce, limForce, "LBF");
+        }
+
+        function updateTableRow(id, rms, peak, limit, unit) {
+            const pct = (peak / limit) * 100;
+            
+            document.getElementById(`resRMS${id}`).innerText = isNaN(rms) ? "-" : rms.toFixed(4);
+            document.getElementById(`resPeak${id}`).innerText = isNaN(peak) ? "-" : peak.toFixed(4);
+            document.getElementById(`limDisplay${id}`).innerText = limit.toLocaleString();
+            document.getElementById(`pct${id}`).innerText = isNaN(pct) ? "-" : Math.round(pct) + "%";
+
+            const statusDot = document.getElementById(`status${id}`);
+            const row = document.getElementById(`row${id}`);
+
+            // איפוס קלאסים מוקדמים
+            statusDot.className = "inline-block w-4 h-4 rounded-full transition ";
+            row.className = "transition font-medium ";
+
+            if (isNaN(pct) || pct === 0) {
+                statusDot.classList.add("bg-gray-300");
+            } else if (pct > 100) {
+                statusDot.classList.add("bg-rose-600", "animate-pulse");
+                row.classList.add("bg-rose-50", "text-rose-900");
+            } else if (pct >= 90) {
+                statusDot.classList.add("bg-amber-400");
+                row.classList.add("bg-amber-50", "text-amber-900");
+            } else {
+                statusDot.classList.add("bg-emerald-500");
+                row.classList.add("bg-white", "text-gray-800");
+            }
+        }
+    </script>
+</body>
+</html>
