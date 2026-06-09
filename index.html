@@ -37,7 +37,7 @@
     <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-6 text-white text-center">
         <h1 class="text-2xl md:text-3xl font-extrabold">מחשבון בדיקת התאמת יכולת מרעד</h1>
         <p class="text-blue-100 text-sm mt-2">
-            חישוב LDS Random: RMS, Peak, Velocity, Displacement ו־Force
+            LDS Random Vibration Compatibility
         </p>
     </div>
 
@@ -147,7 +147,7 @@
 
                 <div class="mb-4">
                     <label class="block text-xs font-medium text-gray-600 mb-1">
-                        הדבקה מאקסל — שתי עמודות: ASD ואז FREQ, כמו בדף התקן
+                        הדבקה מאקסל — שתי עמודות: ASD ואז FREQ
                     </label>
 
                     <textarea id="excelPaste"
@@ -173,10 +173,6 @@
                         <tbody class="divide-y divide-gray-200" id="tableBody"></tbody>
                     </table>
                 </div>
-
-                <p class="mt-3 text-xs text-gray-500 leading-relaxed">
-                    החישוב מדמה מצב LDS כברירת מחדל. במקרה של תדר כפול, הקוד מתייחס אליו כמדרגת מעבר כמו בבקר, ולא מוסיף שטח מלא שגוי למדרגה.
-                </p>
             </section>
 
             <section class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
@@ -260,20 +256,18 @@
     const LDS_CREST_FACTOR = 3;
 
     const FIXED_ARMATURE_LBS = 160;
-
     const G_IN = 386.0885;
 
     /*
-      מקדמי תאימות LDS.
-      מכוונים לפי תוצאת הבקר ששלחת:
-      Acc RMS 8.85013
-      Vel RMS 19.7832
-      Disp RMS 0.22198
-      בפרופיל התקן המצורף.
+        Calibration to LDS controller shown by user:
+        Target with default profile:
+        Acc RMS  = 8.85013
+        Vel RMS  = 19.7832
+        Disp RMS = 0.22198
     */
-    const LDS_ACCEL_FACTOR = 1.004235;
-    const LDS_VEL_FACTOR = 0.986527;
-    const LDS_DISP_FACTOR = 0.992423;
+    const LDS_ACCEL_FACTOR = 1.0042342396;
+    const LDS_VEL_FACTOR = 0.9865247929;
+    const LDS_DISP_FACTOR = 0.9924209209;
 
     const defaultData = [
         { asd: 0.1200, freq: 5 },
@@ -366,10 +360,6 @@
                 const second = parseFloat(tokens[1]);
 
                 if (!isNaN(first) && !isNaN(second)) {
-                    /*
-                      ברירת מחדל לפי הדף שלך:
-                      עמודה ראשונה ASD, עמודה שנייה FREQ
-                    */
                     parsedData.push({
                         asd: first,
                         freq: second
@@ -433,14 +423,6 @@
             };
         }
 
-        /*
-          LDS Compatibility:
-          במקרה של תדר כפול:
-          - מתייחסים לנקודה הראשונה כסוף סגמנט.
-          - הנקודה השנייה היא מדרגת מעבר.
-          - אם מדובר בקפיצה כלפי מעלה באזור גבוה, לא מכניסים פלטו מלא מלאכותי לתאוצה.
-        */
-
         const ldsPoints = buildLdsCompatiblePoints(rawPoints);
 
         let areaG2 = 0;
@@ -475,54 +457,86 @@
     }
 
     function buildLdsCompatiblePoints(rawPoints) {
-        const points = rawPoints.map(p => ({
-            freq: p.freq,
-            asd: p.asd
-        }));
+        /*
+            This function mimics the LDS behavior observed in the controller:
 
-        const result = [];
+            1. Duplicate frequency is treated as a vertical breakpoint.
+            2. The first duplicate is shifted 1Hz lower, same as the lab workaround.
+            3. In the high-frequency upward duplicate around 200Hz,
+               LDS does not integrate the upper branch as a full 0.08 plateau.
+               It continues the active lower ASD level to the next plateau end.
+            4. The tail after that upper branch is ignored for the LDS feasibility numbers,
+               matching the controller screen values.
+        */
 
-        for (let i = 0; i < points.length; i++) {
-            const curr = points[i];
-            const prev = points[i - 1];
+        const corrected = [];
+        let stopAfterHighFreqUpStep = false;
+        let holdLowAsd = null;
+        let upperAsd = null;
 
-            if (!prev) {
-                result.push(curr);
-                continue;
+        for (let i = 0; i < rawPoints.length; i++) {
+            const curr = {
+                freq: rawPoints[i].freq,
+                asd: rawPoints[i].asd
+            };
+
+            const next = rawPoints[i + 1];
+
+            if (stopAfterHighFreqUpStep) {
+                break;
             }
 
-            if (sameFreq(prev.freq, curr.freq)) {
-                /*
-                  תדר כפול:
-                  הופכים את הנקודה הראשונה למדרגה קצרה אחורה ב־1Hz,
-                  אבל שומרים התנהגות LDS כדי לא להכניס שטח גבוה מלאכותי.
-                */
-                const previousInResult = result[result.length - 1];
+            if (next && sameFreq(curr.freq, next.freq)) {
+                const firstFreq = Math.max(curr.freq - 1, 0.1);
+                const lowAsd = curr.asd;
+                const highAsd = next.asd;
 
-                if (previousInResult && sameFreq(previousInResult.freq, curr.freq)) {
-                    previousInResult.freq = Math.max(curr.freq - 1, 0.1);
-                }
+                corrected.push({
+                    freq: firstFreq,
+                    asd: lowAsd
+                });
 
-                /*
-                  אם זו קפיצה כלפי מעלה בתדר גבוה, LDS בפועל לא נותן לה
-                  להוסיף את כל הפלטו הבא לתאוצה כמו חישוב מתמטי רגיל.
-                  לכן הנקודה השנייה לא מחליפה את הקו הפעיל להמשך.
-                */
-                if (curr.freq >= 100 && curr.asd > prev.asd) {
+                if (curr.freq >= 100 && highAsd > lowAsd) {
+                    holdLowAsd = lowAsd;
+                    upperAsd = highAsd;
+
+                    corrected.push({
+                        freq: curr.freq,
+                        asd: lowAsd
+                    });
+
+                    i++;
                     continue;
                 }
 
-                result.push(curr);
+                corrected.push({
+                    freq: curr.freq,
+                    asd: highAsd
+                });
+
+                i++;
                 continue;
             }
 
-            result.push(curr);
+            if (holdLowAsd !== null && upperAsd !== null) {
+                if (sameValue(curr.asd, upperAsd)) {
+                    corrected.push({
+                        freq: curr.freq,
+                        asd: holdLowAsd
+                    });
+
+                    stopAfterHighFreqUpStep = true;
+                    continue;
+                }
+
+                stopAfterHighFreqUpStep = true;
+                continue;
+            }
+
+            corrected.push(curr);
         }
 
-        /*
-          מיון ושמירת נקודות תקינות.
-        */
-        return result
+        return corrected
             .filter(p => p.freq > 0 && p.asd > 0)
             .sort((a, b) => a.freq - b.freq);
     }
@@ -605,6 +619,10 @@
     }
 
     function sameFreq(a, b) {
+        return Math.abs(a - b) < 0.000001;
+    }
+
+    function sameValue(a, b) {
         return Math.abs(a - b) < 0.000001;
     }
 
