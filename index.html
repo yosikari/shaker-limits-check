@@ -516,7 +516,6 @@
         if (points.length >= 2) {
             if (profileType === 'random' || profileType === 'sor' || profileType === 'ror') {
                 const result = calculateRandomProfile(points);
-
                 rmsAccel = result.rmsAccel;
                 rmsVel = result.rmsVel;
                 rmsDisp = result.rmsDisp;
@@ -524,7 +523,6 @@
 
             if (profileType === 'sine') {
                 const result = calculateSineProfile(points);
-
                 rmsAccel = result.rmsAccel;
                 rmsVel = result.rmsVel;
                 rmsDisp = result.rmsDisp;
@@ -604,31 +602,51 @@
             const asd1 = points[i].v;
             const asd2 = points[i + 1].v;
 
-            if (f1 <= 0 || f2 <= 0) {
-                continue;
-            }
-
-            if (f2 <= f1) {
-                continue;
-            }
-
-            if (asd1 <= 0 || asd2 <= 0) {
-                continue;
-            }
+            if (f1 <= 0 || f2 <= 0) continue;
+            if (f2 <= f1) continue;
+            if (asd1 <= 0 || asd2 <= 0) continue;
 
             const m = Math.log(asd2 / asd1) / Math.log(f2 / f1);
 
-            const areaG2 = integratePowerLaw(asd1, f1, m, f1, f2, 0);
+            let areaG2 = 0;
+            let areaV2 = 0;
+            let areaD2 = 0;
 
-            const areaV2 = Math.pow(gIn, 2) / Math.pow(2 * Math.PI, 2) *
-                integratePowerLaw(asd1, f1, m, f1, f2, -2);
+            if (Math.abs(m + 1) < 1e-9) {
+                areaG2 = asd1 * f1 * Math.log(f2 / f1);
+            } else {
+                areaG2 = (asd2 * f2 - asd1 * f1) / (m + 1);
+            }
 
-            const areaD2 = Math.pow(gIn, 2) / Math.pow(2 * Math.PI, 4) *
-                integratePowerLaw(asd1, f1, m, f1, f2, -4);
+            const constV = Math.pow(gIn, 2) / Math.pow(2 * Math.PI, 2);
 
-            totalAreaG2 += areaG2;
-            totalAreaV2 += areaV2;
-            totalAreaD2 += areaD2;
+            if (Math.abs(m - 1) < 1e-9) {
+                areaV2 = constV * (asd1 / f1) * Math.log(f2 / f1);
+            } else {
+                areaV2 = constV * (asd2 / f2 - asd1 / f1) / (m - 1);
+            }
+
+            const constD = Math.pow(gIn, 2) / Math.pow(2 * Math.PI, 4);
+
+            if (Math.abs(m - 3) < 1e-9) {
+                areaD2 = constD * (asd1 / Math.pow(f1, 3)) * Math.log(f2 / f1);
+            } else {
+                areaD2 = constD *
+                    (asd2 / Math.pow(f2, 3) - asd1 / Math.pow(f1, 3)) /
+                    (m - 3);
+            }
+
+            if (isFinite(areaG2) && areaG2 > 0) {
+                totalAreaG2 += areaG2;
+            }
+
+            if (isFinite(areaV2) && areaV2 > 0) {
+                totalAreaV2 += areaV2;
+            }
+
+            if (isFinite(areaD2) && areaD2 > 0) {
+                totalAreaD2 += areaD2;
+            }
         }
 
         return {
@@ -636,19 +654,6 @@
             rmsVel: Math.sqrt(Math.max(totalAreaV2, 0)),
             rmsDisp: Math.sqrt(Math.max(totalAreaD2, 0))
         };
-    }
-
-    function integratePowerLaw(y1, f1, m, startF, endF, extraPower) {
-        const exponent = m + extraPower;
-        const coefficient = y1 / Math.pow(f1, m);
-
-        if (Math.abs(exponent + 1) < 0.000001) {
-            return coefficient * Math.log(endF / startF);
-        }
-
-        return coefficient *
-            (Math.pow(endF, exponent + 1) - Math.pow(startF, exponent + 1)) /
-            (exponent + 1);
     }
 
     function calculateSineProfile(points) {
@@ -739,25 +744,25 @@
             <div class="bg-white rounded-lg border p-3">
                 <div class="text-gray-500 text-xs">Acceleration Expected Peak</div>
                 <div class="font-bold text-lg">${formatNumber(data.peakAccel, 5)} g</div>
-                <div class="text-xs text-gray-500">${formatNumber(pctAccel, 1)}% from limit</div>
+                <div class="text-xs text-gray-500">from limit: ${formatNumber(pctAccel, 1)}%</div>
             </div>
 
             <div class="bg-white rounded-lg border p-3">
                 <div class="text-gray-500 text-xs">Velocity Expected Peak</div>
                 <div class="font-bold text-lg">${formatNumber(data.peakVel, 5)} in/s</div>
-                <div class="text-xs text-gray-500">${formatNumber(pctVel, 1)}% from limit</div>
+                <div class="text-xs text-gray-500">from limit: ${formatNumber(pctVel, 1)}%</div>
             </div>
 
             <div class="bg-white rounded-lg border p-3">
                 <div class="text-gray-500 text-xs">Displacement Expected PK-PK</div>
                 <div class="font-bold text-lg">${formatNumber(data.peakDisp, 5)} in</div>
-                <div class="text-xs text-gray-500">${formatNumber(pctDisp, 1)}% from limit</div>
+                <div class="text-xs text-gray-500">from limit: ${formatNumber(pctDisp, 1)}%</div>
             </div>
 
             <div class="bg-white rounded-lg border p-3 sm:col-span-2">
                 <div class="text-gray-500 text-xs">Force Expected Peak</div>
                 <div class="font-bold text-lg">${formatNumber(data.peakForce, 2)} LBF</div>
-                <div class="text-xs text-gray-500">${formatNumber(pctForce, 1)}% from limit</div>
+                <div class="text-xs text-gray-500">from limit: ${formatNumber(pctForce, 1)}%</div>
             </div>
         `;
     }
