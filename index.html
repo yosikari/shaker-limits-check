@@ -37,7 +37,7 @@
     <div class="bg-gradient-to-r from-blue-700 to-indigo-800 p-6 text-white text-center">
         <h1 class="text-2xl md:text-3xl font-extrabold">מחשבון בדיקת התאמת יכולת מרעד</h1>
         <p class="text-blue-100 text-sm mt-2">
-            LDS Random Vibration Compatibility
+            LDS Random Vibration Compatibility + סריקת טבלה מתמונה
         </p>
     </div>
 
@@ -138,6 +138,17 @@
                             + הוסף שורה
                         </button>
 
+                        <label class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer">
+                            📷 סרוק טבלה
+                            <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onchange="handleImageUpload(event)"
+                                class="hidden"
+                            >
+                        </label>
+
                         <button onclick="clearTable()"
                                 class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
                             נקה
@@ -158,6 +169,8 @@
                               rows="3"
                               class="ltr w-full border border-dashed border-gray-300 rounded-lg p-2 text-xs bg-gray-50 focus:bg-white outline-none"
                               oninput="handleExcelPaste(this)"></textarea>
+
+                    <div id="imageScanStatus" class="mt-2 text-xs text-gray-500"></div>
                 </div>
 
                 <div class="overflow-x-auto max-h-[420px] overflow-y-auto border border-gray-200 rounded-lg">
@@ -258,13 +271,6 @@
     const FIXED_ARMATURE_LBS = 160;
     const G_IN = 386.0885;
 
-    /*
-        Calibration to LDS controller shown by user:
-        Target with default profile:
-        Acc RMS  = 8.85013
-        Vel RMS  = 19.7832
-        Disp RMS = 0.22198
-    */
     const LDS_ACCEL_FACTOR = 1.0042342396;
     const LDS_VEL_FACTOR = 0.9865247929;
     const LDS_DISP_FACTOR = 0.9924209209;
@@ -375,6 +381,96 @@
         }
     }
 
+    async function handleImageUpload(event) {
+        const file = event.target.files && event.target.files[0];
+        const status = document.getElementById("imageScanStatus");
+
+        if (!file) return;
+
+        status.innerText = "מנתח תמונה ומחלץ טבלת ASD/FREQ...";
+        status.className = "mt-2 text-xs text-indigo-700 font-bold";
+
+        try {
+            const imageBase64 = await resizeImageToBase64(file, 1600, 0.85);
+
+            const response = await fetch("/api/extract-table", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ imageBase64 })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "שגיאה בניתוח התמונה");
+            }
+
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+
+            const cleanRows = rows
+                .map(row => ({
+                    asd: Number(row.asd),
+                    freq: Number(row.freq)
+                }))
+                .filter(row =>
+                    Number.isFinite(row.asd) &&
+                    Number.isFinite(row.freq) &&
+                    row.asd > 0 &&
+                    row.freq > 0
+                );
+
+            if (cleanRows.length === 0) {
+                throw new Error("לא נמצאו שורות טבלה תקינות בתמונה");
+            }
+
+            initTable(cleanRows);
+            calculate();
+
+            status.innerText = `הטבלה נטענה בהצלחה מהתמונה: ${cleanRows.length} שורות`;
+            status.className = "mt-2 text-xs text-emerald-700 font-bold";
+
+        } catch (error) {
+            console.error(error);
+            status.innerText = "שגיאה: " + (error.message || "לא הצלחתי לקרוא את הטבלה");
+            status.className = "mt-2 text-xs text-rose-700 font-bold";
+        } finally {
+            event.target.value = "";
+        }
+    }
+
+    function resizeImageToBase64(file, maxWidth = 1600, quality = 0.85) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                const img = new Image();
+
+                img.onload = () => {
+                    const scale = Math.min(1, maxWidth / img.width);
+                    const width = Math.round(img.width * scale);
+                    const height = Math.round(img.height * scale);
+
+                    const canvas = document.createElement("canvas");
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    resolve(canvas.toDataURL("image/jpeg", quality));
+                };
+
+                img.onerror = () => reject(new Error("לא ניתן לקרוא את קובץ התמונה"));
+                img.src = reader.result;
+            };
+
+            reader.onerror = () => reject(new Error("שגיאה בקריאת הקובץ"));
+            reader.readAsDataURL(file);
+        });
+    }
+
     function getTablePoints() {
         const rows = Array.from(document.querySelectorAll('#tableBody tr'));
 
@@ -457,18 +553,6 @@
     }
 
     function buildLdsCompatiblePoints(rawPoints) {
-        /*
-            This function mimics the LDS behavior observed in the controller:
-
-            1. Duplicate frequency is treated as a vertical breakpoint.
-            2. The first duplicate is shifted 1Hz lower, same as the lab workaround.
-            3. In the high-frequency upward duplicate around 200Hz,
-               LDS does not integrate the upper branch as a full 0.08 plateau.
-               It continues the active lower ASD level to the next plateau end.
-            4. The tail after that upper branch is ignored for the LDS feasibility numbers,
-               matching the controller screen values.
-        */
-
         const corrected = [];
         let stopAfterHighFreqUpStep = false;
         let holdLowAsd = null;
